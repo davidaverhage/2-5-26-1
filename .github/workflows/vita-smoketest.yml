@@ -1,0 +1,35 @@
+name: vita-smoketest
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-sample-vpk:
+    runs-on: ubuntu-latest
+    container:
+      image: gnuton/vitasdk-docker:latest
+    steps:
+      - name: Install deps
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git cmake make ninja-build zip ca-certificates
+
+      - name: Build VitaSDK sample (produces .vpk)
+        run: |
+          set -eux
+          git clone --depth 1 https://github.com/vitasdk/samples.git
+          cd samples
+          mkdir -p build
+          cd build
+          cmake ..
+          # Try a single sample target first; if target name differs, fall back to building everything.
+          make -j"$(nproc)" pretty_livearea || make -j"$(nproc)"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          find . -name "*.vpk" -print
+          cp -v "$(find . -name '*.vpk' | head -n 1)" "$GITHUB_WORKSPACE/out/"
+
+      - name: Upload VPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vita-smoketest-vpk
+          path: out/*.vpk
